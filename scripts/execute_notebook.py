@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -15,7 +16,24 @@ def main() -> int:
         raise SystemExit("Usage: execute_notebook.py NOTEBOOK_PATH")
     root = Path(__file__).resolve().parents[1]
     notebook_path = Path(sys.argv[1]).resolve()
-    os.environ["JUPYTER_PATH"] = str(root / ".runtime" / "jupyter" / "share" / "jupyter")
+    kernel_prefix = root / ".runtime" / "jupyter"
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "ipykernel",
+            "install",
+            "--prefix",
+            str(kernel_prefix),
+            "--name",
+            "scenecut-tracking",
+            "--display-name",
+            "SceneCut Tracking Python 3.13",
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
+    os.environ["JUPYTER_PATH"] = str(kernel_prefix / "share" / "jupyter")
     notebook = nbformat.read(notebook_path, as_version=4)
     client = NotebookClient(
         notebook,
@@ -31,4 +49,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
