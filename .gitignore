@@ -1,4 +1,6 @@
 .venv/
+.runtime/
+*.egg-info/
 __pycache__/
 *.py[cod]
 *.pt

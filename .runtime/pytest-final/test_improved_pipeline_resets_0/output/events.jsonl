@@ -1,5 +1,0 @@
-{"event": "identity_assignment", "frame": 0, "local_id": 2, "global_id": 1, "decision": "new_identity", "similarity": null}
-{"event": "identity_assignment", "frame": 0, "local_id": 1, "global_id": 2, "decision": "new_identity", "similarity": null}
-{"event": "scene_cut", "frame": 3, "score": 31.821024305555554, "backend": "pyscenedetect"}
-{"event": "identity_assignment", "frame": 3, "local_id": 2, "global_id": 1, "decision": "recovered", "similarity": 0.9999843239784241}
-{"event": "identity_assignment", "frame": 3, "local_id": 1, "global_id": 2, "decision": "recovered", "similarity": 0.9999849796295166}
