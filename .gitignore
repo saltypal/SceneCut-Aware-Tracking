@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.pt
+.pytest_cache/
+.ipynb_checkpoints/
+data/videos/*
+data/annotations/*
+outputs/*
+weights/*
+!data/videos/.gitkeep
+!data/annotations/.gitkeep
+!outputs/.gitkeep
+!weights/.gitkeep

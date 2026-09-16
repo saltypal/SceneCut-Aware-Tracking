@@ -1,0 +1,2 @@
+[console_scripts]
+scenecut-track = scenecut_tracking.cli:main

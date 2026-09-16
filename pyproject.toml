@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scenecut-aware-tracking"
+version = "0.1.0"
+description = "YOLO + OC-SORT baseline and scene-cut-aware ReID recovery"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "boxmot>=16,<17",
+    "ipykernel>=6.29",
+    "matplotlib>=3.9",
+    "nbclient>=0.10",
+    "nbconvert>=7.16",
+    "nbformat>=5.10",
+    "numpy>=1.26",
+    "opencv-python>=4.10",
+    "pandas>=2.2",
+    "pyyaml>=6.0",
+    "scenedetect>=0.6.6",
+    "scipy>=1.14",
+    "trackeval @ git+https://github.com/JonathonLuiten/TrackEval.git@12c8791b303e0a0b50f753af204249e622d0281a",
+    "ultralytics>=8.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3"]
+
+[project.scripts]
+scenecut-track = "scenecut_tracking.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

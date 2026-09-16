@@ -1,0 +1,17 @@
+boxmot<17,>=16
+ipykernel>=6.29
+matplotlib>=3.9
+nbclient>=0.10
+nbconvert>=7.16
+nbformat>=5.10
+numpy>=1.26
+opencv-python>=4.10
+pandas>=2.2
+pyyaml>=6.0
+scenedetect[opencv]>=0.6.6
+scipy>=1.14
+trackeval @ git+https://github.com/JonathonLuiten/TrackEval.git@12c8791b303e0a0b50f753af204249e622d0281a
+ultralytics>=8.3
+
+[dev]
+pytest>=8.3

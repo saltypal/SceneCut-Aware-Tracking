@@ -1,0 +1,41 @@
+detector:
+  model: yolo11n.pt
+  confidence: 0.25
+  iou: 0.70
+  image_size: 640
+  person_class: 0
+  device: auto
+
+tracker:
+  detection_threshold: 0.25
+  max_age: 30
+  min_hits: 3
+  iou_threshold: 0.30
+  delta_t: 3
+  inertia: 0.20
+  use_byte: false
+
+scene_cut:
+  backend: pyscenedetect
+  content_threshold: 27.0
+  min_scene_length: 15
+  histogram_threshold: 0.62
+
+reid:
+  weights: osnet_x0_25_msmt17.pt
+  device: auto
+  similarity_threshold: 0.75
+  recovery_window_frames: 15
+  gallery_size: 20
+  minimum_crop_width: 12
+  minimum_crop_height: 24
+
+evaluation:
+  match_iou_threshold: 0.50
+  cut_tolerance_frames: 2
+
+output:
+  codec: mp4v
+  draw_confidence: true
+  save_sample_frames: 6
+

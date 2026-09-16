@@ -1,0 +1,17 @@
+{
+  "mode": "improved",
+  "frames": 6,
+  "source_fps": 10.0,
+  "processing_fps": 298.669427693579,
+  "elapsed_seconds": 0.02008910000040487,
+  "track_rows": 12,
+  "unique_global_ids": 2,
+  "detected_scene_cuts": 1,
+  "cut_frames": [
+    3
+  ],
+  "accepted_recoveries": 2,
+  "average_recovery_similarity": 0.9999846518039703,
+  "annotated_video": "D:\\Bunker\\BaseCamp\\SceneCut Aware tracking\\.runtime\\pytest-final\\test_improved_pipeline_resets_0\\output\\annotated_improved.mp4",
+  "tracks_mot": "D:\\Bunker\\BaseCamp\\SceneCut Aware tracking\\.runtime\\pytest-final\\test_improved_pipeline_resets_0\\output\\tracks_mot.txt"
+}
