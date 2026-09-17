@@ -8,6 +8,8 @@ from pathlib import Path
 
 import numpy as np
 
+from .detection_cache import DetectionCache
+
 
 def _load_mot(path: str | Path, is_ground_truth: bool) -> dict[int, list[tuple[int, np.ndarray]]]:
     by_frame: dict[int, list[tuple[int, np.ndarray]]] = defaultdict(list)
@@ -154,3 +156,78 @@ def cross_cut_recovery_summary(
         "cross_cut_recovery_rate": (100.0 * recovered / verified) if verified else None,
     }
 
+
+def evaluate_detection_cache(
+    ground_truth_path: str | Path,
+    cache_path: str | Path,
+    iou_threshold: float = 0.5,
+) -> dict:
+    """Evaluate cached person detections with one-to-one IoU matching and AP50."""
+    ground_truth = _load_mot(ground_truth_path, is_ground_truth=True)
+    cache = DetectionCache.load(cache_path)
+    total_ground_truth = sum(len(rows) for rows in ground_truth.values())
+    ranked: list[tuple[float, int, np.ndarray]] = []
+    frame_count = int(cache.metadata["video"]["frame_count"])
+    for frame_index in range(frame_count):
+        for detection in cache.for_frame(frame_index):
+            ranked.append((float(detection[4]), frame_index + 1, detection[:4].astype(float)))
+    ranked.sort(key=lambda item: item[0], reverse=True)
+
+    matched: dict[int, set[int]] = defaultdict(set)
+    true_positive = np.zeros(len(ranked), dtype=float)
+    false_positive = np.zeros(len(ranked), dtype=float)
+    for detection_index, (_, frame, box) in enumerate(ranked):
+        frame_ground_truth = ground_truth.get(frame, [])
+        if not frame_ground_truth:
+            false_positive[detection_index] = 1.0
+            continue
+        gt_boxes = np.asarray([row[1] for row in frame_ground_truth], dtype=float)
+        overlaps = box_iou_matrix(gt_boxes, box.reshape(1, 4))[:, 0]
+        candidate_order = np.argsort(-overlaps)
+        match_index = next(
+            (
+                int(candidate)
+                for candidate in candidate_order
+                if overlaps[candidate] >= iou_threshold and int(candidate) not in matched[frame]
+            ),
+            None,
+        )
+        if match_index is None:
+            false_positive[detection_index] = 1.0
+        else:
+            matched[frame].add(match_index)
+            true_positive[detection_index] = 1.0
+
+    cumulative_tp = np.cumsum(true_positive)
+    cumulative_fp = np.cumsum(false_positive)
+    recall_curve = cumulative_tp / max(total_ground_truth, 1)
+    precision_curve = cumulative_tp / np.maximum(cumulative_tp + cumulative_fp, 1e-12)
+    recall_points = np.linspace(0.0, 1.0, 101)
+    interpolated = [
+        float(np.max(precision_curve[recall_curve >= level]))
+        if np.any(recall_curve >= level)
+        else 0.0
+        for level in recall_points
+    ]
+    average_precision = float(np.mean(interpolated))
+    tp = int(cumulative_tp[-1]) if len(cumulative_tp) else 0
+    fp = int(cumulative_fp[-1]) if len(cumulative_fp) else 0
+    fn = int(total_ground_truth - tp)
+    precision = tp / max(tp + fp, 1)
+    recall = tp / max(total_ground_truth, 1)
+    runtime = cache.metadata.get("runtime", {})
+    return {
+        "IoU_threshold": float(iou_threshold),
+        "AP50": 100.0 * average_precision,
+        "precision": 100.0 * precision,
+        "recall": 100.0 * recall,
+        "F1": 100.0 * (2.0 * precision * recall / max(precision + recall, 1e-12)),
+        "TP": tp,
+        "FP": fp,
+        "FN": fn,
+        "GT_detections": int(total_ground_truth),
+        "Predicted_detections": int(len(ranked)),
+        "average_detections_per_frame": len(ranked) / max(frame_count, 1),
+        "processing_fps": runtime.get("processing_fps"),
+        "elapsed_seconds": runtime.get("elapsed_seconds"),
+    }

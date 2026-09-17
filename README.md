@@ -1,98 +1,56 @@
 # SceneCut Aware Tracking
 
-Minimal, modular person tracking with two controlled experiments:
+CPU-only, no-training comparison of three multi-object tracking pipelines:
 
-1. **Baseline:** pretrained YOLO detections followed by OC-SORT.
-2. **Improved:** the same detections followed by OC-SORT, hard-cut detection, motion-state reset, and conservative OSNet identity recovery.
+1. pretrained YOLO11 person detections + OC-SORT;
+2. the same YOLO11 detections + Deep OC-SORT using pretrained OSNet;
+3. the same YOLO11 detections + Deep OC-SORT + hard-scene-cut reset and
+   conservative cross-cut identity recovery.
 
-There is no training or fine-tuning in this repository.
+## Inputs
 
-## Why detections are cached
-
-YOLO runs once. Both experiments consume the same immutable `.npz` cache, so any difference comes from tracking and cross-cut identity handling rather than different detector results.
-
-## Environment
-
-BoxMOT supports Python 3.10–3.13. On this machine use Python 3.13:
-
-```powershell
-cd "D:\Bunker\BaseCamp\SceneCut Aware tracking"
-$env:UV_CACHE_DIR = "$PWD\.runtime\uv-cache"
-uv venv .venv --python C:\py\python.exe
-uv pip install --python .venv\Scripts\python.exe -e ".[dev]"
-```
-
-## Notebooks
-
-Run in order:
+Every frame is processed for all four videos:
 
 ```text
-notebooks/01_YOLO_OCSORT_Baseline.ipynb
-notebooks/02_SceneCut_ReID_Recovery.ipynb
+data/videos/desktop_clips/football-1.mp4
+data/videos/desktop_clips/football-2.mp4
+data/videos/desktop_clips/football-3.mp4
+data/MI6.mp4
 ```
 
-Each notebook can create a small two-scene validation video when no football video is supplied. That demo validates execution; it is not evidence of football-domain accuracy.
+The canonical experiment configuration is `configs/ultimate_cpu.yaml`.
 
-## Command-line reproduction
+## Controlled comparison
 
-Create the small annotated demo:
+YOLO11 is run exactly once per source video. The resulting immutable detection
+cache is shared by all three trackers for that video. Therefore tracker results
+cannot differ because of different detector calls.
 
-```powershell
-.venv\Scripts\python.exe -m scenecut_tracking.cli make-demo
-```
+At a hard cut, the cut-aware method discards short-term motion/Kalman state but
+preserves bounded long-term appearance memory. A previous global identity is
+restored only when one-to-one OSNet similarity passes the configured threshold;
+otherwise a new global ID is created.
 
-Run YOLO once:
+## Outputs
 
-```powershell
-.venv\Scripts\python.exe -m scenecut_tracking.cli detect `
-  --video data\videos\demo_people.mp4 `
-  --output outputs\detections\demo_people.npz
-```
+All twelve experiment results live under `outputs/experiments`. See
+`outputs/README.md` for the artifact contract. Previous results are preserved
+under `outputs/archive_previous`.
 
-Run the baseline:
+## Notebook
 
-```powershell
-.venv\Scripts\python.exe -m scenecut_tracking.cli run `
-  --mode baseline `
-  --video data\videos\demo_people.mp4 `
-  --detections outputs\detections\demo_people.npz `
-  --output outputs\baseline\demo
-```
-
-Run the improvement:
-
-```powershell
-.venv\Scripts\python.exe -m scenecut_tracking.cli run `
-  --mode improved `
-  --video data\videos\demo_people.mp4 `
-  --detections outputs\detections\demo_people.npz `
-  --output outputs\improved\demo
-```
-
-Evaluate with the official TrackEval implementations used by OC-SORT:
-
-```powershell
-.venv\Scripts\python.exe -m scenecut_tracking.cli evaluate `
-  --ground-truth data\annotations\demo_people_gt.txt `
-  --prediction outputs\baseline\demo\tracks_mot.txt `
-  --output outputs\baseline\demo\paper_metrics.json
-```
-
-The paper-aligned table contains HOTA, AssA, IDF1, MOTA, FP, FN, identity switches (`IDs`), and fragmentations (`Frag`). Metrics require identity ground truth. The notebooks will not fabricate these values when a custom video has no annotations.
-
-## Design invariant at a hard cut
+The final presentation artifact will be:
 
 ```text
-discard: OC-SORT tracks + Kalman motion state + local tracker-ID mapping
-preserve: global identity memory + bounded OSNet embedding galleries
+notebooks/Ultimate_YOLO11_Tracking_Comparison.ipynb
 ```
 
-New-shot tracks are assigned an old global identity only after one-to-one cosine-similarity matching passes the configured threshold. Otherwise, they receive a new identity.
+It will contain the architecture, full-frame validation, twelve result videos,
+metrics tables, plots, event analysis, limitations, and reproduction commands.
 
-## Limitations
+## Evaluation honesty
 
-- Person ReID is difficult in football because teammates wear nearly identical kits.
-- The conservative threshold intentionally favors missed recovery over false identity merging.
-- Published OC-SORT scores used different detectors and benchmark datasets. This project uses the same evaluation metrics, not the same expected scores.
-- Real football accuracy must be measured with football identity annotations.
-
+Runtime, frame coverage, detected cuts, tracks, global IDs, ReID decisions, and
+FPS can be reported for all videos. HOTA, AssA, IDF1, MOTA, true identity
+switches, and true recovery accuracy require identity ground truth and will not
+be fabricated for unannotated custom clips.

@@ -103,10 +103,18 @@ def plot_metric_comparison(
         x = np.arange(len(rate_names))
         width = 0.36
         fig, ax = plt.subplots(figsize=(9, 5))
-        ax.bar(x - width / 2, [baseline[n] for n in rate_names], width, label="Baseline", color="#176B87")
-        ax.bar(x + width / 2, [improved[n] for n in rate_names], width, label="Improved", color="#D59F32")
+        baseline_values = [baseline[name] for name in rate_names]
+        improved_values = [improved[name] for name in rate_names]
+        baseline_bars = ax.bar(x - width / 2, baseline_values, width, label="Baseline", color="#176B87")
+        improved_bars = ax.bar(x + width / 2, improved_values, width, label="Improved", color="#D59F32")
         ax.set(title="Paper-aligned tracking accuracy", ylabel="Score (%)", xticks=x, xticklabels=rate_names)
-        ax.set_ylim(0, 100)
+        all_values = baseline_values + improved_values
+        lower = min(0.0, min(all_values))
+        upper = max(0.0, max(all_values))
+        span = max(upper - lower, 1.0)
+        ax.set_ylim(lower - 0.12 * span, upper + 0.20 * span)
+        ax.bar_label(baseline_bars, fmt="%.2f", padding=3, fontsize=8)
+        ax.bar_label(improved_bars, fmt="%.2f", padding=3, fontsize=8)
         ax.legend(frameon=False)
         ax.grid(axis="y", color="#D9DEE3", linewidth=0.8)
         fig.tight_layout()
@@ -120,9 +128,14 @@ def plot_metric_comparison(
         x = np.arange(len(count_names))
         width = 0.36
         fig, ax = plt.subplots(figsize=(9, 5))
-        ax.bar(x - width / 2, [baseline[n] for n in count_names], width, label="Baseline", color="#176B87")
-        ax.bar(x + width / 2, [improved[n] for n in count_names], width, label="Improved", color="#D59F32")
-        ax.set(title="Tracking errors (lower is better)", ylabel="Count", xticks=x, xticklabels=count_names)
+        baseline_values = [baseline[name] for name in count_names]
+        improved_values = [improved[name] for name in count_names]
+        baseline_bars = ax.bar(x - width / 2, baseline_values, width, label="Baseline", color="#176B87")
+        improved_bars = ax.bar(x + width / 2, improved_values, width, label="Improved", color="#D59F32")
+        ax.set(title="Tracking errors (lower is better; symmetric log scale)", ylabel="Count", xticks=x, xticklabels=count_names)
+        ax.set_yscale("symlog", linthresh=1.0)
+        ax.bar_label(baseline_bars, fmt="%.0f", padding=3, fontsize=8)
+        ax.bar_label(improved_bars, fmt="%.0f", padding=3, fontsize=8)
         ax.legend(frameon=False)
         ax.grid(axis="y", color="#D9DEE3", linewidth=0.8)
         fig.tight_layout()
@@ -131,4 +144,3 @@ def plot_metric_comparison(
         plt.close(fig)
         created.append(path)
     return created
-

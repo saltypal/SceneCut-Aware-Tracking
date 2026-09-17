@@ -14,6 +14,7 @@ import numpy as np
 
 from .config import save_config
 from .detection_cache import DetectionCache
+from .frame_source import iter_source_frames
 from .identity_memory import IdentityMemory
 from .ocsort_tracker import OCSortTracker
 from .runtime import environment_metadata, write_json
@@ -92,7 +93,7 @@ def run_video(
     output = Path(output_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
     cache = DetectionCache.load(detection_cache_path)
-    metadata = cache.validate_video(video_path)
+    metadata = cache.validate_source(video_path)
     tracker = OCSortTracker(config["tracker"])
 
     scene_detector = None
@@ -109,7 +110,6 @@ def run_video(
             gallery_size=config["reid"]["gallery_size"],
         )
 
-    capture = cv2.VideoCapture(str(Path(video_path).resolve()))
     writer = cv2.VideoWriter(
         str(output / f"annotated_{mode}.mp4"),
         cv2.VideoWriter_fourcc(*str(config["output"]["codec"])),
@@ -117,7 +117,6 @@ def run_video(
         (metadata.width, metadata.height),
     )
     if not writer.isOpened():
-        capture.release()
         raise RuntimeError("OpenCV could not create the annotated output video")
 
     records: list[TrackRecord] = []
@@ -131,10 +130,7 @@ def run_video(
     ) if sample_target_count else set()
     sample_dir = output / "sample_frames"
 
-    while True:
-        success, frame = capture.read()
-        if not success:
-            break
+    for frame_index, frame in iter_source_frames(video_path):
         cut_detected = False
         if mode == "improved":
             decision = scene_detector.update(frame_index, frame)
@@ -170,12 +166,11 @@ def run_video(
         if frame_index in sample_indices:
             sample_dir.mkdir(parents=True, exist_ok=True)
             cv2.imwrite(str(sample_dir / f"frame_{frame_index:06d}.jpg"), annotated)
-        frame_index += 1
+    processed_frames = frame_index + 1 if metadata.frame_count else 0
 
     elapsed = time.perf_counter() - processing_started
-    capture.release()
     writer.release()
-    if frame_index == 0:
+    if processed_frames == 0:
         raise RuntimeError("No video frames were decoded")
 
     tracks_csv, mot_path = _save_tracks(records, output)
@@ -188,9 +183,9 @@ def run_video(
     recovered_events = [event for event in events if event.get("decision") == "recovered"]
     summary = {
         "mode": mode,
-        "frames": frame_index,
+        "frames": processed_frames,
         "source_fps": metadata.fps,
-        "processing_fps": frame_index / max(elapsed, 1e-12),
+        "processing_fps": processed_frames / max(elapsed, 1e-12),
         "elapsed_seconds": elapsed,
         "track_rows": len(records),
         "unique_global_ids": len({record.global_id for record in records}),
@@ -215,4 +210,3 @@ def run_video(
         output / "run_metadata.json",
     )
     return summary
-

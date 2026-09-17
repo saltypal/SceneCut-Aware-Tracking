@@ -14,3 +14,7 @@ weights/*
 !data/annotations/.gitkeep
 !outputs/.gitkeep
 !weights/.gitkeep
+tests/*
+configs/*
+data/*
+scripts/*

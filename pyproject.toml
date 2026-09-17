@@ -10,6 +10,7 @@ requires-python = ">=3.10,<3.14"
 dependencies = [
     "boxmot>=16,<17",
     "ipykernel>=6.29",
+    "imageio-ffmpeg>=0.6.0",
     "matplotlib>=3.9",
     "nbclient>=0.10",
     "nbconvert>=7.16",
@@ -20,6 +21,9 @@ dependencies = [
     "pyyaml>=6.0",
     "scenedetect>=0.6.6",
     "scipy>=1.14",
+    "pycocotools>=2.0.11",
+    "tabulate>=0.10",
+    "thop>=0.1.1",
     "trackeval @ git+https://github.com/JonathonLuiten/TrackEval.git@12c8791b303e0a0b50f753af204249e622d0281a",
     "ultralytics>=8.3",
 ]

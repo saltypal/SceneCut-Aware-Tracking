@@ -1,13 +1,17 @@
 detector:
-  model: yolo11n.pt
-  confidence: 0.25
-  iou: 0.70
+  # The football baseline uses the official COCO-pretrained YOLOX-S checkpoint.
+  # No detector or ReID model is trained or fine-tuned in this project.
+  backend: yolox
+  model: yolox_s
+  weights: yolox_s.pth
+  confidence: 0.05
+  iou: 0.45
   image_size: 640
   person_class: 0
-  device: auto
+  device: cpu
 
 tracker:
-  detection_threshold: 0.25
+  detection_threshold: 0.05
   max_age: 30
   min_hits: 3
   iou_threshold: 0.30
@@ -23,7 +27,7 @@ scene_cut:
 
 reid:
   weights: osnet_x0_25_msmt17.pt
-  device: auto
+  device: cpu
   similarity_threshold: 0.75
   recovery_window_frames: 15
   gallery_size: 20
@@ -38,4 +42,3 @@ output:
   codec: mp4v
   draw_confidence: true
   save_sample_frames: 6
-

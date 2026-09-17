@@ -23,8 +23,8 @@ def _parser() -> argparse.ArgumentParser:
     demo.add_argument("--video", default=str(project_root() / "data" / "videos" / "demo_people.mp4"))
     demo.add_argument("--ground-truth", default=str(project_root() / "data" / "annotations" / "demo_people_gt.txt"))
 
-    detect = subparsers.add_parser("detect", help="Run YOLO once and save the immutable detection cache")
-    detect.add_argument("--video", required=True)
+    detect = subparsers.add_parser("detect", help="Run one detector once and save its immutable cache")
+    detect.add_argument("--video", required=True, help="Video file, sequence root, or img1 directory")
     detect.add_argument("--output", required=True)
 
     run = subparsers.add_parser("run", help="Run baseline or improved tracking from cached detections")
@@ -39,10 +39,23 @@ def _parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--output", required=True)
     evaluate.add_argument("--cut-frames", nargs="*", type=int, default=[])
 
+    evaluate_detections = subparsers.add_parser(
+        "evaluate-detections", help="Evaluate a detector cache against MOT ground truth"
+    )
+    evaluate_detections.add_argument("--ground-truth", required=True)
+    evaluate_detections.add_argument("--detections", required=True)
+    evaluate_detections.add_argument("--output", required=True)
+
     compare = subparsers.add_parser("compare", help="Plot baseline and improved paper metrics")
     compare.add_argument("--baseline", required=True)
     compare.add_argument("--improved", required=True)
     compare.add_argument("--output", required=True)
+
+    browser_video = subparsers.add_parser(
+        "browser-video", help="Create an H.264 fast-start copy for notebook/browser playback"
+    )
+    browser_video.add_argument("--input", required=True)
+    browser_video.add_argument("--output", required=True)
     return parser
 
 
@@ -95,15 +108,27 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         write_json(result, args.output)
-    else:
+    elif args.command == "evaluate-detections":
+        from .evaluation import evaluate_detection_cache
+
+        result = evaluate_detection_cache(
+            args.ground_truth,
+            args.detections,
+            iou_threshold=config["evaluation"]["match_iou_threshold"],
+        )
+        write_json(result, args.output)
+    elif args.command == "compare":
         from .visualization import plot_metric_comparison
 
         paths = plot_metric_comparison(args.baseline, args.improved, args.output)
         result = {"plots": [str(path) for path in paths]}
+    else:
+        from .video_export import make_browser_video
+
+        result = {"video": str(make_browser_video(args.input, args.output))}
     print(json.dumps(result, indent=2, allow_nan=False))
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

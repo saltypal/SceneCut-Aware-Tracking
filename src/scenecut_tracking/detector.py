@@ -1,4 +1,9 @@
-"""Pretrained YOLO person detector."""
+"""Pretrained person-detector adapters used by both tracking experiments.
+
+The project defaults to official COCO-pretrained YOLOX-S.  The Ultralytics
+adapter remains available for controlled detector comparisons, but a run must
+always cache its detections before either tracker experiment begins.
+"""
 
 from __future__ import annotations
 
@@ -10,17 +15,83 @@ from .runtime import configure_runtime, resolve_device
 
 
 class YoloPersonDetector:
-    """Thin, deterministic adapter around Ultralytics prediction mode."""
+    """Dispatch to a configured pretrained detector without changing its outputs."""
 
     def __init__(self, config: dict, project_root: str | Path):
         configure_runtime(project_root)
-        from ultralytics import YOLO
-
         self.config = config
+        self.project_root = Path(project_root).resolve()
         self.device = resolve_device(str(config.get("device", "auto")))
-        self.model = YOLO(str(config["model"]))
+        self.backend = str(config.get("backend", "ultralytics")).lower()
+        if self.backend == "yolox":
+            self._load_yolox()
+        elif self.backend == "ultralytics":
+            from ultralytics import YOLO
+
+            model_reference = Path(str(config["model"]))
+            if not model_reference.is_absolute():
+                project_model = self.project_root / model_reference
+                if project_model.is_file():
+                    model_reference = project_model
+            self.model = YOLO(str(model_reference))
+        else:
+            raise ValueError(f"Unsupported detector backend: {self.backend}")
+
+    def _load_yolox(self) -> None:
+        """Load the official YOLOX implementation and checkpoint from local paths."""
+        import sys
+        import torch
+
+        yolox_root = self.project_root / ".runtime" / "YOLOX"
+        checkpoint_path = self.project_root / "weights" / str(self.config["weights"])
+        if not yolox_root.is_dir():
+            raise FileNotFoundError(
+                "Official YOLOX source is missing. Run the project setup command in README first."
+            )
+        if not checkpoint_path.is_file():
+            raise FileNotFoundError(
+                f"YOLOX checkpoint is missing: {checkpoint_path}. Run the project setup command first."
+            )
+        if str(yolox_root) not in sys.path:
+            sys.path.insert(0, str(yolox_root))
+        from yolox.exp import get_exp
+
+        experiment = get_exp(None, str(self.config["model"]))
+        self.model = experiment.get_model().to(self.device).eval()
+        checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
+        state_dict = checkpoint["model"] if "model" in checkpoint else checkpoint
+        self.model.load_state_dict(state_dict, strict=True)
+        self.yolox_experiment = experiment
+
+    def _detect_yolox(self, frame: np.ndarray) -> np.ndarray:
+        import torch
+        from yolox.data.data_augment import preproc
+        from yolox.utils import postprocess
+
+        image_size = int(self.config["image_size"])
+        transformed, resize_ratio = preproc(frame, (image_size, image_size))
+        tensor = torch.from_numpy(transformed).unsqueeze(0).float().to(self.device)
+        with torch.no_grad():
+            raw_output = self.model(tensor)
+            output = postprocess(
+                raw_output,
+                num_classes=int(self.yolox_experiment.num_classes),
+                conf_thre=float(self.config["confidence"]),
+                nms_thre=float(self.config["iou"]),
+                class_agnostic=True,
+            )[0]
+        if output is None or len(output) == 0:
+            return np.empty((0, 6), dtype=np.float32)
+        rows = output.detach().cpu().numpy()
+        boxes = rows[:, :4] / max(float(resize_ratio), 1e-12)
+        confidence = (rows[:, 4] * rows[:, 5]).reshape(-1, 1)
+        classes = rows[:, 6].reshape(-1, 1)
+        people = classes[:, 0] == int(self.config["person_class"])
+        return np.hstack([boxes[people], confidence[people], classes[people]]).astype(np.float32)
 
     def detect(self, frame: np.ndarray) -> np.ndarray:
+        if self.backend == "yolox":
+            return self._detect_yolox(frame)
         result = self.model.predict(
             source=frame,
             conf=float(self.config["confidence"]),
@@ -36,4 +107,3 @@ class YoloPersonDetector:
         confidence = result.boxes.conf.detach().cpu().numpy().reshape(-1, 1)
         classes = result.boxes.cls.detach().cpu().numpy().reshape(-1, 1)
         return np.hstack([boxes, confidence, classes]).astype(np.float32)
-

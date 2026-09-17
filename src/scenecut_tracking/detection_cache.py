@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
-import cv2
 import numpy as np
 
-from .runtime import read_video_metadata
+from .frame_source import iter_source_frames, read_source_metadata
 from .types import VideoMetadata
 
 
@@ -44,8 +44,8 @@ class DetectionCache:
             metadata = json.loads(str(payload["metadata"].item()))
         return cls(rows=rows, metadata=metadata)
 
-    def validate_video(self, video_path: str | Path) -> VideoMetadata:
-        current = read_video_metadata(video_path)
+    def validate_source(self, source_path: str | Path) -> VideoMetadata:
+        current = read_source_metadata(source_path)
         cached = self.metadata["video"]
         mismatches = []
         for field in ["fingerprint", "frame_count", "width", "height"]:
@@ -53,39 +53,48 @@ class DetectionCache:
                 mismatches.append(field)
         if mismatches:
             raise ValueError(
-                "Detection cache does not belong to this video; mismatched fields: "
+                "Detection cache does not belong to this source; mismatched fields: "
                 + ", ".join(mismatches)
             )
         return current
 
+    def validate_video(self, video_path: str | Path) -> VideoMetadata:
+        """Backward-compatible alias for existing callers and notebooks."""
+        return self.validate_source(video_path)
 
-def build_detection_cache(video_path: str | Path, detector, detector_config: dict) -> DetectionCache:
-    metadata = read_video_metadata(video_path)
-    capture = cv2.VideoCapture(str(Path(video_path).resolve()))
+
+def build_detection_cache(source_path: str | Path, detector, detector_config: dict) -> DetectionCache:
+    metadata = read_source_metadata(source_path)
     rows: list[np.ndarray] = []
-    frame_index = 0
-    while True:
-        success, frame = capture.read()
-        if not success:
-            break
+    frame_count = 0
+    started = time.perf_counter()
+    for frame_index, frame in iter_source_frames(source_path):
         detections = detector.detect(frame)
         if len(detections):
             frame_column = np.full((len(detections), 1), frame_index, dtype=np.float32)
             rows.append(np.hstack([frame_column, detections]))
-        frame_index += 1
-    capture.release()
-    if frame_index != metadata.frame_count:
+        frame_count = frame_index + 1
+    if frame_count != metadata.frame_count:
         metadata = VideoMetadata(
             path=metadata.path,
             fingerprint=metadata.fingerprint,
-            frame_count=frame_index,
+            frame_count=frame_count,
             width=metadata.width,
             height=metadata.height,
             fps=metadata.fps,
         )
     all_rows = np.vstack(rows) if rows else np.empty((0, 7), dtype=np.float32)
+    elapsed = time.perf_counter() - started
     return DetectionCache(
         rows=all_rows,
-        metadata={"schema_version": 1, "video": metadata.to_dict(), "detector": detector_config},
+        metadata={
+            "schema_version": 2,
+            "video": metadata.to_dict(),
+            "detector": detector_config,
+            "runtime": {
+                "elapsed_seconds": elapsed,
+                "processing_fps": frame_count / max(elapsed, 1e-12),
+                "detection_rows": int(len(all_rows)),
+            },
+        },
     )
-
