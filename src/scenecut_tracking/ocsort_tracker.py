@@ -27,9 +27,15 @@ def _patch_boxmot_numpy_compatibility() -> None:
         if self.attr_saved is None:
             return
         new_history = deepcopy(list(self.history_obs))
+        observed_indices = np.flatnonzero([item is not None for item in new_history])
+        if len(observed_indices) < 2:
+            # A long gap can evict the previous observation from the bounded
+            # history. There is no pair of boxes to interpolate, so retain the
+            # Kalman prediction and let the incoming measurement update it.
+            self.attr_saved = None
+            return
         self.__dict__ = self.attr_saved
         self.history_obs = deque(list(self.history_obs)[:-1], maxlen=self.max_obs)
-        observed_indices = np.where(np.asarray([item is None for item in new_history]) == 0)[0]
         index1, index2 = observed_indices[-2], observed_indices[-1]
         box1, box2 = new_history[index1], new_history[index2]
         x1, y1, s1, r1 = box1

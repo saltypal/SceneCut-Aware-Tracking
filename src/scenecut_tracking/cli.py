@@ -16,7 +16,7 @@ def project_root() -> Path:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", default=str(project_root() / "configs" / "default.yaml"))
+    parser.add_argument("--config", default=str(project_root() / "configs" / "ultimate_cpu.yaml"))
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     demo = subparsers.add_parser("make-demo", help="Create the annotated two-scene smoke-test video")

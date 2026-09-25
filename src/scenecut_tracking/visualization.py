@@ -6,6 +6,9 @@ import json
 from pathlib import Path
 
 import cv2
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -21,20 +24,47 @@ def identity_color(identity_id: int) -> tuple[int, int, int]:
 
 def draw_tracks(frame: np.ndarray, tracks: list[TrackRecord], cut: bool = False) -> np.ndarray:
     annotated = frame.copy()
+    frame_height, frame_width = annotated.shape[:2]
+    font_scale = max(0.45, min(0.70, frame_height / 1080.0 * 0.72))
     for track in tracks:
         color = identity_color(track.global_id)
-        p1 = (int(round(track.x1)), int(round(track.y1)))
-        p2 = (int(round(track.x2)), int(round(track.y2)))
+        p1 = (
+            int(np.clip(round(track.x1), 0, frame_width - 1)),
+            int(np.clip(round(track.y1), 0, frame_height - 1)),
+        )
+        p2 = (
+            int(np.clip(round(track.x2), 0, frame_width - 1)),
+            int(np.clip(round(track.y2), 0, frame_height - 1)),
+        )
+        if p2[0] <= p1[0] or p2[1] <= p1[1]:
+            continue
+        # The dark outer stroke keeps boxes visible on both bright pitch and dark film shots.
+        cv2.rectangle(annotated, p1, p2, (0, 0, 0), 4)
         cv2.rectangle(annotated, p1, p2, color, 2)
         label = f"ID {track.global_id}"
+        (text_width, text_height), _ = cv2.getTextSize(
+            label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1
+        )
+        label_width = text_width + 10
+        label_height = text_height + 8
+        label_x = int(np.clip(p1[0], 0, max(0, frame_width - label_width)))
+        label_y = p1[1] - label_height if p1[1] >= label_height else p1[1] + 1
+        label_y = int(np.clip(label_y, 0, max(0, frame_height - label_height)))
+        cv2.rectangle(
+            annotated,
+            (label_x, label_y),
+            (label_x + label_width, label_y + label_height),
+            (0, 0, 0),
+            -1,
+        )
         cv2.putText(
             annotated,
             label,
-            (p1[0], max(18, p1[1] - 7)),
+            (label_x + 5, label_y + text_height + 3),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.58,
+            font_scale,
             color,
-            2,
+            1,
             cv2.LINE_AA,
         )
     if cut:

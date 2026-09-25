@@ -33,7 +33,9 @@ class DeepOCSortTracker:
             reid_weights=weights,
             device=device,
             half=bool(self.deep_config.get("half", False)),
-            det_thresh=float(self.tracker_config["detection_threshold"]),
+            det_thresh=float(
+                self.deep_config.get("detection_threshold", self.tracker_config["detection_threshold"])
+            ),
             max_age=int(self.tracker_config["max_age"]),
             min_hits=int(self.tracker_config["min_hits"]),
             iou_threshold=float(self.tracker_config["iou_threshold"]),

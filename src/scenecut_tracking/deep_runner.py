@@ -24,7 +24,7 @@ from .video_export import make_browser_video
 from .visualization import draw_tracks, plot_run_diagnostics
 
 
-VALID_MODES = {"deep_ocsort", "deep_ocsort_scenecut"}
+VALID_MODES = {"deep_ocsort", "deep_ocsort_osnet", "deep_ocsort_scenecut"}
 
 
 def run_deep_video(
@@ -44,7 +44,13 @@ def run_deep_video(
     output.mkdir(parents=True, exist_ok=True)
     cache = DetectionCache.load(detection_cache_path)
     metadata = cache.validate_source(video_path)
-    tracker = DeepOCSortTracker(config["tracker"], config["deep_ocsort"], project_root)
+    deep_config = dict(config["deep_ocsort"])
+    if mode == "deep_ocsort_osnet":
+        # Appearance-assisted OC-SORT column: use OSNet embeddings directly in
+        # association, without scene-cut reset or long-term identity memory.
+        deep_config["w_association_emb"] = 1.0
+        deep_config["aw_off"] = True
+    tracker = DeepOCSortTracker(config["tracker"], deep_config, project_root)
     appearance_cache = None
     if appearance_cache_path is not None:
         appearance_cache = AppearanceCache.load(appearance_cache_path)
@@ -101,6 +107,8 @@ def run_deep_video(
                             "frame": frame_index,
                             "score": decision.score,
                             "backend": decision.backend,
+                            "histogram_distance": decision.histogram_distance,
+                            "pixel_difference": decision.pixel_difference,
                         }
                     )
 
@@ -157,14 +165,18 @@ def run_deep_video(
         if generated.exists():
             generated.replace(plots_dir / plot_name)
 
-    save_config(config, output / "effective_config.yaml")
+    effective_config = dict(config)
+    effective_config["deep_ocsort"] = deep_config
+    save_config(effective_config, output / "effective_config.yaml")
     browser_path = make_browser_video(annotated_path, output / "annotated_h264.mp4")
     recovered_events = [event for event in events if event.get("decision") == "recovered"]
     summary = {
         "mode": mode,
         "method": (
-            "YOLO11 + Deep OC-SORT + Scene Cut"
+            "YOLO11 + Deep OC-SORT + Cut ReID"
             if cut_aware
+            else "YOLO11 + Deep OC-SORT (OSNet weight 1.0)"
+            if mode == "deep_ocsort_osnet"
             else "YOLO11 + Deep OC-SORT"
         ),
         "frames": processed_frames,

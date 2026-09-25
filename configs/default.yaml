@@ -1,38 +1,42 @@
 detector:
-  # The football baseline uses the official COCO-pretrained YOLOX-S checkpoint.
-  # No detector or ReID model is trained or fine-tuned in this project.
-  backend: yolox
-  model: yolox_s
-  weights: yolox_s.pth
-  confidence: 0.05
-  iou: 0.45
+  # Legacy single-video CLI configuration. The five-video comparison uses
+  # configs/ultimate_cpu.yaml instead. No model is trained here.
+  backend: ultralytics
+  model: yolo11n.pt
+  weights: yolo11n.pt
+  confidence: 0.85
+  iou: 0.50
   image_size: 640
   person_class: 0
+  max_detections: 5
   device: cpu
 
 tracker:
-  detection_threshold: 0.05
+  detection_threshold: 0.60
   max_age: 30
   min_hits: 3
   iou_threshold: 0.30
   delta_t: 3
   inertia: 0.20
-  use_byte: false
+  use_byte: true
+
+  # BYTE first creates/matches tracks with detections above detection_threshold.
+  # Its second pass can reconnect existing tracks using weaker detections.
 
 scene_cut:
   backend: pyscenedetect
-  content_threshold: 27.0
-  min_scene_length: 15
-  histogram_threshold: 0.62
+  content_threshold: 42.0
+  min_scene_length: 45
+  histogram_threshold: 0.7
 
 reid:
   weights: osnet_x0_25_msmt17.pt
   device: cpu
-  similarity_threshold: 0.75
-  recovery_window_frames: 15
+  similarity_threshold: 0.085
+  recovery_window_frames: 30
   gallery_size: 20
-  minimum_crop_width: 12
-  minimum_crop_height: 24
+  minimum_crop_width: 16
+  minimum_crop_height: 32
 
 evaluation:
   match_iou_threshold: 0.50

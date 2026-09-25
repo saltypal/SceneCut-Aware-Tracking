@@ -1,4 +1,4 @@
-"""Pretrained person-detector adapters used by both tracking experiments.
+"""Pretrained single-class detector adapters used by tracking experiments.
 
 The project defaults to official COCO-pretrained YOLOX-S.  The Ultralytics
 adapter remains available for controlled detector comparisons, but a run must
@@ -23,16 +23,20 @@ class YoloPersonDetector:
         self.project_root = Path(project_root).resolve()
         self.device = resolve_device(str(config.get("device", "auto")))
         self.backend = str(config.get("backend", "ultralytics")).lower()
+        self.target_class = int(config.get("target_class", config.get("person_class", 0)))
         if self.backend == "yolox":
             self._load_yolox()
         elif self.backend == "ultralytics":
-            from ultralytics import YOLO
-
             model_reference = Path(str(config["model"]))
             if not model_reference.is_absolute():
                 project_model = self.project_root / model_reference
                 if project_model.is_file():
                     model_reference = project_model
+            if config.get("local_only", False) and not model_reference.is_file():
+                raise FileNotFoundError(f"Local detector weights are missing: {model_reference}")
+
+            from ultralytics import YOLO
+
             self.model = YOLO(str(model_reference))
         else:
             raise ValueError(f"Unsupported detector backend: {self.backend}")
@@ -86,8 +90,10 @@ class YoloPersonDetector:
         boxes = rows[:, :4] / max(float(resize_ratio), 1e-12)
         confidence = (rows[:, 4] * rows[:, 5]).reshape(-1, 1)
         classes = rows[:, 6].reshape(-1, 1)
-        people = classes[:, 0] == int(self.config["person_class"])
-        return np.hstack([boxes[people], confidence[people], classes[people]]).astype(np.float32)
+        selected = classes[:, 0] == self.target_class
+        detections = np.hstack([boxes[selected], confidence[selected], classes[selected]])
+        max_detections = int(self.config.get("max_detections", len(detections)))
+        return detections[np.argsort(-detections[:, 4])[:max_detections]].astype(np.float32)
 
     def detect(self, frame: np.ndarray) -> np.ndarray:
         if self.backend == "yolox":
@@ -97,7 +103,8 @@ class YoloPersonDetector:
             conf=float(self.config["confidence"]),
             iou=float(self.config["iou"]),
             imgsz=int(self.config["image_size"]),
-            classes=[int(self.config["person_class"])],
+            classes=[self.target_class],
+            max_det=int(self.config.get("max_detections", 300)),
             device=self.device,
             verbose=False,
         )[0]

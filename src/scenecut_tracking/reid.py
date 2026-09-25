@@ -11,12 +11,15 @@ from .runtime import configure_runtime, resolve_device
 
 class OSNetEmbedder:
     def __init__(self, config: dict, project_root: str | Path):
+        weights = Path(project_root) / "weights" / str(config["weights"])
+        if config.get("local_only", True) and not weights.is_file():
+            raise FileNotFoundError(f"Local ReID weights are missing: {weights}")
+
         configure_runtime(project_root)
         from boxmot.reid.core.reid_handler import ReID
 
         self.config = config
         self.device = resolve_device(str(config.get("device", "auto")))
-        weights = Path(project_root) / "weights" / str(config["weights"])
         weights.parent.mkdir(parents=True, exist_ok=True)
         self.model = ReID(weights=weights, device=self.device, half=False)
 
@@ -30,4 +33,3 @@ class OSNetEmbedder:
         )
         norms = np.linalg.norm(features, axis=1, keepdims=True)
         return features / np.maximum(norms, 1e-12)
-

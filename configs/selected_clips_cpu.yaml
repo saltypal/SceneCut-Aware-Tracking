@@ -1,0 +1,123 @@
+experiment:
+  name: selected_clips_yolo11n_cpu
+  device: cpu
+  process_all_frames: true
+  videos:
+    oppie: data/oppie.mp4
+    resist: data/resist.mp4
+    Joker: data/Joker.mp4
+    elonkanye: data/elonKanye.mp4
+    saul: data/saul.mp4
+    MI6: data/MI6.mp4
+    football-1: data/videos/desktop_clips/football-1.mp4
+    football-2: data/videos/desktop_clips/football-2.mp4
+    football-3: data/videos/desktop_clips/football-3.mp4
+  # Confidence cuts limit partial boxes; football keeps room for all players.
+  # Only detector/tracker/scene-cut parameters are overridden per video.
+  video_overrides:
+    oppie:
+      detector:
+        confidence: 0.50
+      tracker:
+        detection_threshold: 0.50
+        use_byte: false
+    resist:
+      scene_cut:
+        # All 11 content candidates are visible hard cuts; the old 0.12
+        # pixel guard rejected every one in this consistently dark clip.
+        hard_cut_pixel_threshold: 0.07
+    Joker:
+      detector:
+        confidence: 0.25
+    elonkanye:
+      detector:
+        confidence: 0.50
+      tracker:
+        detection_threshold: 0.50
+        use_byte: false
+    saul:
+      detector:
+        confidence: 0.30
+    MI6:
+      detector:
+        confidence: 0.35
+    football-1:
+      detector:
+        confidence: 0.25
+        max_detections: 50
+    football-2:
+      detector:
+        confidence: 0.25
+        max_detections: 50
+    football-3:
+      detector:
+        confidence: 0.25
+        max_detections: 50
+  methods:
+    - ocsort
+    - deep_ocsort
+    - deep_ocsort_scenecut
+  output_root: outputs/selected_clips
+  detection_cache_root: outputs/detection_cache
+  appearance_cache_root: outputs/appearance_cache
+  gallery_filename: selected_clips_gallery.html
+  manifest_filename: selected_clips_manifest.json
+  gallery_title: Selected clips — SceneCut Aware Tracking
+
+detector:
+  backend: ultralytics
+  model: yolo11n.pt
+  local_only: true
+  confidence: 0.20
+  iou: 0.50
+  image_size: 640
+  person_class: 0
+  max_detections: 20
+  device: cpu
+
+tracker:
+  detection_threshold: 0.35
+  max_age: 60
+  min_hits: 3
+  iou_threshold: 0.30
+  delta_t: 3
+  inertia: 0.20
+  use_byte: true
+
+deep_ocsort:
+  weights: osnet_x0_25_msmt17.pt
+  device: cpu
+  half: false
+  w_association_emb: 0.50
+  alpha_fixed_emb: 0.95
+  aw_param: 0.50
+  embedding_off: false
+  cmc_off: false
+  aw_off: false
+
+scene_cut:
+  backend: pyscenedetect
+  content_threshold: 27.0
+  min_scene_length: 15
+  hard_cut_histogram_threshold: 0.40
+  hard_cut_pixel_threshold: 0.12
+  histogram_threshold: 0.62
+
+reid:
+  weights: osnet_x0_25_msmt17.pt
+  device: cpu
+  similarity_threshold: 0.75
+  recovery_window_frames: 15
+  gallery_size: 20
+  minimum_crop_width: 12
+  minimum_crop_height: 24
+
+evaluation:
+  match_iou_threshold: 0.50
+  cut_tolerance_frames: 2
+
+output:
+  codec: mp4v
+  browser_codec: h264
+  draw_confidence: true
+  save_sample_frames: 6

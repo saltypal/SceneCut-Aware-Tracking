@@ -145,6 +145,8 @@ def run_video(
                         "frame": frame_index,
                         "score": decision.score,
                         "backend": decision.backend,
+                        "histogram_distance": decision.histogram_distance,
+                        "pixel_difference": decision.pixel_difference,
                     }
                 )
 
